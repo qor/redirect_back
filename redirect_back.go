@@ -1,11 +1,17 @@
 package redirect_back
 
 import (
+	"context"
+	"fmt"
 	"net/http"
 	"strings"
 
+	"github.com/qor/qor/utils"
 	"github.com/qor/session"
+	"github.com/qor/session/manager"
 )
+
+var returnToKey utils.ContextKey = "redirect_back_return_to"
 
 // Config redirect back config
 type Config struct {
@@ -18,6 +24,14 @@ type Config struct {
 
 // New initialize redirect back instance
 func New(config *Config) *RedirectBack {
+	if config.SessionManager == nil {
+		config.SessionManager = manager.SessionManager
+	}
+
+	if config.FallbackPath == "" {
+		config.FallbackPath = "/"
+	}
+
 	redirectBack := &RedirectBack{config: config}
 	redirectBack.compile()
 	return redirectBack
@@ -58,22 +72,26 @@ func (redirectBack *RedirectBack) IgnorePath(req *http.Request) bool {
 
 // RedirectBack redirect back to last visited page
 func (redirectBack *RedirectBack) RedirectBack(w http.ResponseWriter, req *http.Request) {
-	if returnTo := redirectBack.config.SessionManager.Pop(req, "return_to"); returnTo != "" {
-		http.Redirect(w, req, returnTo, http.StatusSeeOther)
+	returnTo := req.Context().Value(returnToKey)
+
+	if returnTo != nil {
+		http.Redirect(w, req, fmt.Sprint(returnTo), http.StatusSeeOther)
+		return
 	}
 
-	if redirectBack.config.FallbackPath != "" {
-		http.Redirect(w, req, redirectBack.config.FallbackPath, http.StatusSeeOther)
-	}
-
-	http.Redirect(w, req, "/", http.StatusSeeOther)
+	http.Redirect(w, req, redirectBack.config.FallbackPath, http.StatusSeeOther)
 }
 
 // Middleware returns a RedirectBack middleware instance that record return_to path
 func (redirectBack *RedirectBack) Middleware(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if !redirectBack.IgnorePath(req) {
-			redirectBack.config.SessionManager.Add(req, "return_to", req.URL.String())
+			returnTo := redirectBack.config.SessionManager.Get(req, "return_to")
+			req = req.WithContext(context.WithValue(req.Context(), returnToKey, returnTo))
+
+			if returnTo != req.URL.String() {
+				redirectBack.config.SessionManager.Add(req, "return_to", req.URL.String())
+			}
 		}
 
 		handler.ServeHTTP(w, req)
