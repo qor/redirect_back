@@ -56,9 +56,26 @@ func (redirectBack *RedirectBack) IgnorePath(req *http.Request) bool {
 	return false
 }
 
+// RedirectBack redirect back to last visited page
+func (redirectBack *RedirectBack) RedirectBack(w http.ResponseWriter, req *http.Request) {
+	if returnTo := redirectBack.config.SessionManager.Pop(req, "return_to"); returnTo != "" {
+		http.Redirect(w, req, returnTo, http.StatusSeeOther)
+	}
+
+	if redirectBack.config.FallbackPath != "" {
+		http.Redirect(w, req, redirectBack.config.FallbackPath, http.StatusSeeOther)
+	}
+
+	http.Redirect(w, req, "/", http.StatusSeeOther)
+}
+
 // Middleware returns a RedirectBack middleware instance that record return_to path
-func (redirectBack RedirectBack) Middleware(handler http.Handler) http.Handler {
+func (redirectBack *RedirectBack) Middleware(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if !redirectBack.IgnorePath(req) {
+			redirectBack.config.SessionManager.Add(req, "return_to", req.URL.String())
+		}
+
 		handler.ServeHTTP(w, req)
 	})
 }
