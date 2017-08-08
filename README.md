@@ -15,9 +15,10 @@ import (
 )
 
 var RedirectBack = redirect_back.New(&redirect_back.Config{
-	IgnoredPaths:    []string{"/login"}, // Will ignore requests that has those paths when set return path
-	IgnoredPrefixes: []string{"/auth"},  // Will ignore requests that has those prefixes when set return path
-	IgnoreFunc: func(req *http.Request) bool { // Will ignore requests if `IgnoreFunc` returns true
+	IgnoredPaths:      []string{"/login"},     // Will ignore requests that has those paths when set return path
+	IgnoredPrefixes:   []string{"/auth"},      // Will ignore requests that has those prefixes when set return path
+	AllowedExtensions: []string{"", ".html"}   // Only save requests w/o extension or extension `.html` (default setting)
+	IgnoreFunc: func(req *http.Request) bool { // Will ignore request if `IgnoreFunc` returns true
 		return false
 	},
 	SessionManager: manager.SessionManager,
@@ -38,7 +39,7 @@ func homeHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func pageHandler(w http.ResponseWriter, req *http.Request) {
-	// redirect to return path or the default one
+	// Redirect to return path or the default one
 	RedirectBack.RedirectBack(w, req)
 }
 ```
