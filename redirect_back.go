@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"strings"
 
@@ -49,7 +50,8 @@ type RedirectBack struct {
 	ignoredPathsMap      map[string]bool
 	allowedExtensionsMap map[string]bool
 
-	Ignore func(req *http.Request) bool
+	Ignore     func(req *http.Request) bool
+	IgnorePath func(pth string) bool
 }
 
 func (redirectBack *RedirectBack) compile() {
@@ -64,30 +66,34 @@ func (redirectBack *RedirectBack) compile() {
 		redirectBack.allowedExtensionsMap[ext] = true
 	}
 
-	redirectBack.Ignore = func(req *http.Request) bool {
-		if req.Method != "GET" {
+	redirectBack.IgnorePath = func(pth string) bool {
+		if !redirectBack.allowedExtensionsMap[filepath.Ext(pth)] {
 			return true
 		}
 
-		if !redirectBack.allowedExtensionsMap[filepath.Ext(req.URL.Path)] {
-			return true
-		}
-
-		if redirectBack.ignoredPathsMap[req.URL.Path] {
+		if redirectBack.ignoredPathsMap[pth] {
 			return true
 		}
 
 		for _, prefix := range redirectBack.config.IgnoredPrefixes {
-			if strings.HasPrefix(req.URL.Path, prefix) {
+			if strings.HasPrefix(pth, prefix) {
 				return true
 			}
+		}
+
+		return false
+	}
+
+	redirectBack.Ignore = func(req *http.Request) bool {
+		if req.Method != "GET" {
+			return true
 		}
 
 		if redirectBack.config.IgnoreFunc != nil {
 			return redirectBack.config.IgnoreFunc(req)
 		}
 
-		return false
+		return redirectBack.IgnorePath(req.URL.Path)
 	}
 }
 
@@ -100,9 +106,11 @@ func (redirectBack *RedirectBack) RedirectBack(w http.ResponseWriter, req *http.
 		return
 	}
 
-	if req.Referer() != "" {
-		http.Redirect(w, req, req.Referer(), http.StatusSeeOther)
-		return
+	if referrer := req.Referer(); referrer != "" {
+		if u, _ := url.Parse(referrer); !redirectBack.IgnorePath(u.Path) {
+			http.Redirect(w, req, referrer, http.StatusSeeOther)
+			return
+		}
 	}
 
 	http.Redirect(w, req, redirectBack.config.FallbackPath, http.StatusSeeOther)
