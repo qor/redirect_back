@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/qor/middlewares"
 	"github.com/qor/qor/utils"
 	"github.com/qor/session"
 	"github.com/qor/session/manager"
@@ -41,6 +42,15 @@ func New(config *Config) *RedirectBack {
 
 	redirectBack := &RedirectBack{config: config}
 	redirectBack.compile()
+
+	middlewares.Use(middlewares.Middleware{
+		Name:        "redirect_back",
+		InsertAfter: []string{"session"},
+		Handler: func(handler http.Handler) http.Handler {
+			return redirectBack.Middleware(handler)
+		},
+	})
+
 	return redirectBack
 }
 
