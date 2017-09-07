@@ -133,7 +133,7 @@ func (redirectBack *RedirectBack) Middleware(handler http.Handler) http.Handler 
 		req = req.WithContext(context.WithValue(req.Context(), returnToKey, returnTo))
 
 		if !redirectBack.Ignore(req) && returnTo != req.URL.String() {
-			redirectBack.config.SessionManager.Add(req, "return_to", req.URL.String())
+			redirectBack.config.SessionManager.Add(w, req, "return_to", req.URL.String())
 		}
 
 		handler.ServeHTTP(w, req)
