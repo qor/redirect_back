@@ -112,8 +112,10 @@ func (redirectBack *RedirectBack) RedirectBack(w http.ResponseWriter, req *http.
 	returnTo := req.Context().Value(returnToKey)
 
 	if returnTo != nil {
-		http.Redirect(w, req, fmt.Sprint(returnTo), http.StatusSeeOther)
-		return
+		if returnToStr := fmt.Sprint(returnTo); "" != returnToStr {
+			http.Redirect(w, req, returnToStr, http.StatusSeeOther)
+			return
+		}
 	}
 
 	if referrer := req.Referer(); referrer != "" {
