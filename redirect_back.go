@@ -129,10 +129,15 @@ func (redirectBack *RedirectBack) RedirectBack(w http.ResponseWriter, req *http.
 // Middleware returns a RedirectBack middleware instance that record return_to path
 func (redirectBack *RedirectBack) Middleware(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if redirectBack.Ignore(req) {
+			handler.ServeHTTP(w, req)
+			return
+		}
+
 		returnTo := redirectBack.config.SessionManager.Get(req, "return_to")
 		req = req.WithContext(context.WithValue(req.Context(), returnToKey, returnTo))
 
-		if !redirectBack.Ignore(req) && returnTo != req.URL.String() {
+		if returnTo != req.URL.String() {
 			redirectBack.config.SessionManager.Add(w, req, "return_to", req.URL.String())
 		}
 
